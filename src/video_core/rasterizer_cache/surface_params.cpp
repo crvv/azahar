@@ -22,7 +22,7 @@ bool SurfaceParams::CanSubRect(const SurfaceParams& sub_surface) const {
            (sub_surface.addr - mipmap_offsets[level]) % BytesInPixels(is_tiled ? 64 : 1) == 0 &&
            (sub_surface.stride == (stride >> level) ||
             sub_surface.height <= (is_tiled ? 8u : 1u)) &&
-           GetSubRect(sub_surface).right <= stride;
+           GetSubRect(sub_surface).right <= (stride >> level);
 }
 
 bool SurfaceParams::CanReinterpret(const SurfaceParams& other_surface) {

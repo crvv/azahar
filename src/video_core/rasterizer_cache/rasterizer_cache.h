@@ -970,16 +970,17 @@ SurfaceId RasterizerCache<T>::FindMatch(const SurfaceParams& params, ScaleMatch 
         });
         IsMatch_Helper(std::integral_constant<MatchFlags, MatchFlags::Copy>{}, [&] {
             ASSERT(validate_interval);
-            const SurfaceInterval copy_interval =
-                surface.GetCopyableInterval(params.FromInterval(*validate_interval));
+            const SurfaceInterval copy_interval = surface.GetCopyableInterval(
+                params.FromInterval(*validate_interval), *validate_interval);
             const bool matched = boost::icl::length(copy_interval & *validate_interval) != 0 &&
                                  surface.CanCopy(params, copy_interval);
             return std::make_pair(matched, copy_interval);
         });
         IsMatch_Helper(std::integral_constant<MatchFlags, MatchFlags::Reinterpret>{}, [&] {
             ASSERT(validate_interval);
+            const SurfaceParams reinterpret_params = params.FromInterval(*validate_interval);
             const SurfaceInterval copy_interval =
-                surface.GetCopyableInterval(params.FromInterval(*validate_interval));
+                surface.GetCopyableInterval(reinterpret_params, reinterpret_params.GetInterval());
             const bool matched = boost::icl::length(copy_interval & *validate_interval) != 0 &&
                                  surface.CanReinterpret(params);
             return std::make_pair(matched, copy_interval);
@@ -1046,7 +1047,8 @@ void RasterizerCache<T>::ValidateSurface(SurfaceId surface_id, PAddr addr, u32 s
             FindMatch<MatchFlags::Copy>(params, ScaleMatch::Ignore, interval);
         if (copy_surface_id && copy_surface_id != surface_id) {
             Surface& copy_surface = slot_surfaces[copy_surface_id];
-            const SurfaceInterval copy_interval = copy_surface.GetCopyableInterval(params);
+            const SurfaceInterval copy_interval =
+                copy_surface.GetCopyableInterval(params, interval);
             CopySurface(copy_surface, surface, copy_interval);
             notify_validated(copy_interval);
             continue;
@@ -1308,7 +1310,8 @@ bool RasterizerCache<T>::ValidateByReinterpretation(Surface& surface, SurfacePar
         FindMatch<MatchFlags::Reinterpret>(params, ScaleMatch::Ignore, interval);
     if (reinterpret_id) {
         Surface& src_surface = slot_surfaces[reinterpret_id];
-        const SurfaceInterval copy_interval = src_surface.GetCopyableInterval(params);
+        const SurfaceInterval copy_interval =
+            src_surface.GetCopyableInterval(params, params.GetInterval());
         if (boost::icl::is_empty(copy_interval & interval)) {
             return false;
         }

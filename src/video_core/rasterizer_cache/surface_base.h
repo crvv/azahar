@@ -35,8 +35,9 @@ public:
     /// Returns true when surface can validate copy_interval of dest_surface
     bool CanCopy(const SurfaceParams& dest_surface, SurfaceInterval copy_interval) const;
 
-    /// Returns the region of the biggest valid rectange within interval
-    SurfaceInterval GetCopyableInterval(const SurfaceParams& params) const;
+    /// Returns a valid rectangle that is contained in the requested interval.
+    SurfaceInterval GetCopyableInterval(const SurfaceParams& params,
+                                        SurfaceInterval interval) const;
 
     /// Returns the clear value used to validate another surface from this fill surface
     ClearValue MakeClearValue(PAddr copy_addr, PixelFormat dst_format);

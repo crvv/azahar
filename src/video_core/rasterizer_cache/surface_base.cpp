@@ -60,11 +60,12 @@ bool SurfaceBase::CanCopy(const SurfaceParams& dest_surface, SurfaceInterval cop
     return false;
 }
 
-SurfaceInterval SurfaceBase::GetCopyableInterval(const SurfaceParams& params) const {
+SurfaceInterval SurfaceBase::GetCopyableInterval(const SurfaceParams& params,
+                                                 SurfaceInterval interval) const {
     SurfaceInterval result{};
     const u32 tile_align = params.BytesInPixels(params.is_tiled ? 8 * 8 : 1);
     const auto valid_regions =
-        SurfaceRegions{params.GetInterval() & GetInterval()} - invalid_regions;
+        SurfaceRegions{params.GetInterval() & GetInterval() & interval} - invalid_regions;
 
     for (auto& valid_interval : valid_regions) {
         const SurfaceInterval aligned_interval{
@@ -97,6 +98,24 @@ SurfaceInterval SurfaceBase::GetCopyableInterval(const SurfaceParams& params) co
             const SurfaceInterval row2{boost::icl::first(rect_interval),
                                        boost::icl::last_next(aligned_interval)};
             rect_interval = (boost::icl::length(row1) > boost::icl::length(row2)) ? row1 : row2;
+        }
+
+        // The same tiles can be addressed with different row strides. In that case,
+        // copy only as far as the next row boundary in either surface.
+        const PAddr row_start = aligned_interval.lower();
+        const u32 level = LevelOf(row_start);
+        if (type != SurfaceType::Fill && pixel_format == params.pixel_format &&
+            is_tiled == params.is_tiled && (row_start - mipmap_offsets[level]) % tile_align == 0 &&
+            !CanSubRect(params.FromInterval(rect_interval))) {
+            const u32 src_stride_bytes = BytesInPixels((stride >> level) * (is_tiled ? 8 : 1));
+            const u32 src_row_remaining =
+                src_stride_bytes - (row_start - mipmap_offsets[level]) % src_stride_bytes;
+            const u32 dst_row_remaining = stride_bytes - (row_start - params.addr) % stride_bytes;
+            rect_interval = {
+                row_start,
+                std::min(aligned_interval.upper(),
+                         row_start + std::min(src_row_remaining, dst_row_remaining)),
+            };
         }
 
         if (boost::icl::length(rect_interval) > boost::icl::length(result)) {
